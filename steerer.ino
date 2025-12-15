@@ -71,10 +71,16 @@ class MyServerCallbacks : public BLEServerCallbacks
     void onDisconnect(BLEServer *pServer)
     {
         deviceConnected = false;
+        // Reset auth flag to ensure proper authentication on reconnection
+        auth = false;
     }
 };
 
 //Characteristic Callbacks
+// Auth Flow:
+// 1. Device sends auth challenge (0x03, 0x10, 0xff, 0xff)
+// 2. Zwift responds with 4-byte auth response (format: 0x03, 0x10, XX, XX)
+// 3. Device validates response and sends auth success (0x03, 0x11, 0xff)
 class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 {
 
@@ -87,8 +93,9 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 
         std::string rxValue = pRx->getValue();
         
-        if(rxValue.length() == 4){
-          delay(250);
+        // Validate auth response: must be 4 bytes with correct header (0x03, 0x10)
+        if(rxValue.length() == 4 && rxValue[0] == 0x03 && rxValue[1] == 0x10){
+          // Send auth success response without blocking delay
           pTx->setValue(authSuccess,3);
           pTx->indicate();
           auth = true;
